@@ -259,8 +259,7 @@ serviceSchema.virtual('totalRequiredDocuments').get(function() {
   return this.requiredDocuments.filter(doc => doc.isRequired).length;
 });
 
-// Indexes
-serviceSchema.index({ serviceId: 1 });
+// Indexes (skip duplicating unique field index for serviceId)
 serviceSchema.index({ category: 1 });
 serviceSchema.index({ isActive: 1 });
 serviceSchema.index({ priority: -1 });

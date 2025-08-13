@@ -88,7 +88,8 @@ const userSchema = new mongoose.Schema({
       'view_queue',
       'manage_queue',
       'access_digital_locker',
-      'manage_digital_locker'
+      'manage_digital_locker',
+      'manage_services'
     ]
   }],
 
@@ -221,41 +222,31 @@ const userSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-// Virtual for full name
+// Virtuals
 userSchema.virtual('fullNameVirtual').get(function() {
   return `${this.firstName} ${this.lastName}`;
 });
-
-// Virtual for address string
 userSchema.virtual('fullAddress').get(function() {
   return `${this.address.streetAddress}, Ward ${this.address.ward}, ${this.address.municipality}, ${this.address.district}, ${this.address.province}`;
 });
 
-// Indexes
-userSchema.index({ citizenshipNumber: 1 });
-userSchema.index({ mobileNumber: 1 });
-userSchema.index({ email: 1 });
+// Indexes (avoid duplicating indexes for fields that already specify unique:true)
 userSchema.index({ role: 1 });
 userSchema.index({ 'address.ward': 1 });
 userSchema.index({ createdAt: -1 });
 
 // Pre-save middleware
 userSchema.pre('save', async function(next) {
-  // Only hash the password if it has been modified (or is new)
   if (!this.isModified('password')) return next();
-
   try {
-    // Hash password with cost of 12
     this.password = await bcrypt.hash(this.password, 12);
     next();
   } catch (error) {
     next(error);
   }
 });
-
 userSchema.pre('save', function(next) {
   if (!this.isModified('password') || this.isNew) return next();
-
   this.passwordChangedAt = Date.now() - 1000;
   next();
 });
@@ -264,7 +255,6 @@ userSchema.pre('save', function(next) {
 userSchema.methods.correctPassword = async function(candidatePassword, userPassword) {
   return await bcrypt.compare(candidatePassword, userPassword);
 };
-
 userSchema.methods.changedPasswordAfter = function(JWTTimestamp) {
   if (this.passwordChangedAt) {
     const changedTimestamp = parseInt(this.passwordChangedAt.getTime() / 1000, 10);
@@ -272,30 +262,22 @@ userSchema.methods.changedPasswordAfter = function(JWTTimestamp) {
   }
   return false;
 };
-
 userSchema.methods.isLocked = function() {
   return !!(this.lockUntil && this.lockUntil > Date.now());
 };
-
 userSchema.methods.incLoginAttempts = function() {
-  // If we have a previous lock that has expired, restart at 1
   if (this.lockUntil && this.lockUntil < Date.now()) {
     return this.updateOne({
       $unset: { lockUntil: 1 },
       $set: { loginAttempts: 1 }
     });
   }
-  
   const updates = { $inc: { loginAttempts: 1 } };
-  
-  // Lock account after 5 failed attempts
   if (this.loginAttempts + 1 >= 5 && !this.isLocked()) {
-    updates.$set = { lockUntil: Date.now() + 2 * 60 * 60 * 1000 }; // 2 hours
+    updates.$set = { lockUntil: Date.now() + 2 * 60 * 60 * 1000 };
   }
-  
   return this.updateOne(updates);
 };
-
 userSchema.methods.resetLoginAttempts = function() {
   return this.updateOne({
     $unset: { loginAttempts: 1, lockUntil: 1 }
@@ -306,15 +288,12 @@ userSchema.methods.resetLoginAttempts = function() {
 userSchema.statics.findByCitizenship = function(citizenshipNumber) {
   return this.findOne({ citizenshipNumber });
 };
-
 userSchema.statics.findByMobile = function(mobileNumber) {
   return this.findOne({ mobileNumber });
 };
-
 userSchema.statics.findByEmail = function(email) {
   return this.findOne({ email: email.toLowerCase() });
 };
-
 userSchema.statics.findStaffByWard = function(ward) {
   return this.find({
     role: { $in: ['staff', 'admin'] },
@@ -324,5 +303,4 @@ userSchema.statics.findStaffByWard = function(ward) {
 };
 
 const User = mongoose.model('User', userSchema);
-
 export default User;

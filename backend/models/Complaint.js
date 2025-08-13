@@ -340,8 +340,7 @@ complaintSchema.virtual('priorityColor').get(function() {
   return colors[this.priority] || 'bg-gray-500';
 });
 
-// Indexes
-complaintSchema.index({ complaintId: 1 });
+// Indexes (skip duplicating unique field index for complaintId)
 complaintSchema.index({ complainant: 1 });
 complaintSchema.index({ status: 1 });
 complaintSchema.index({ priority: -1 });

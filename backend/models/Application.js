@@ -283,8 +283,7 @@ applicationSchema.virtual('statusColor').get(function() {
   return colors[this.status] || 'bg-gray-500';
 });
 
-// Indexes
-applicationSchema.index({ applicationId: 1 });
+// Indexes (skip duplicating unique field index for applicationId)
 applicationSchema.index({ applicant: 1 });
 applicationSchema.index({ service: 1 });
 applicationSchema.index({ status: 1 });

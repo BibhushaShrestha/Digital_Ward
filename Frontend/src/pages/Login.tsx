@@ -19,10 +19,12 @@ import {
   Shield,
   Building,
 } from "lucide-react";
+import { api, auth } from "@/lib/api";
 
 export function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loginType, setLoginType] = useState("citizenship");
+  const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     citizenship: "",
     mobile: "",
@@ -34,34 +36,58 @@ export function Login() {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  const handleLogin = () => {
-    // Mock login - in real app, this would connect to Supabase
-    toast({
-      title: "Login Successful",
-      description: `Welcome ${formData.role}!`,
-    });
-    
-    // Redirect based on role
-    switch (formData.role) {
-      case "citizen":
-        navigate("/");
-        break;
-      case "staff":
-        navigate("/analytics");
-        break;
-      case "admin":
-        navigate("/analytics");
-        break;
-      default:
-        navigate("/");
+  const handleLogin = async () => {
+    setIsLoading(true);
+    try {
+      const payload: any = { loginType, password: formData.password };
+      if (loginType === 'citizenship') payload.citizenshipNumber = formData.citizenship;
+      if (loginType === 'mobile') {
+        payload.mobileNumber = formData.mobile;
+        if (formData.otp) payload.otp = formData.otp;
+      }
+      if (loginType === 'email') payload.email = formData.email;
+
+      const res = await api<{ success: boolean; data: { token: string; user: any } }>("/api/auth/login", {
+        method: 'POST',
+        body: payload,
+      });
+      auth.setToken(res.data.token);
+      toast({ title: "Login Successful", description: `Welcome ${res.data.user.fullName}` });
+
+      if (res.data.user.role === 'citizen') navigate('/');
+      else navigate('/analytics');
+    } catch (e: any) {
+      toast({ title: "Login failed", description: e.message, variant: "destructive" });
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleRegister = () => {
-    toast({
-      title: "Registration Successful",
-      description: "Please verify your mobile number with OTP",
-    });
+  const handleRegister = async () => {
+    setIsLoading(true);
+    try {
+      const payload = {
+        firstName: formData.email.split('@')[0] || 'Citizen',
+        lastName: 'User',
+        citizenshipNumber: formData.citizenship || '01-0000-00000',
+        mobileNumber: formData.mobile || '+9779812345678',
+        email: formData.email || undefined,
+        password: formData.password || 'secret12',
+        dateOfBirth: '1990-01-01',
+        gender: 'other',
+        address: { province: 'Bagmati', district: 'Kathmandu', municipality: 'KMC', ward: 1, streetAddress: 'N/A' }
+      };
+      const res = await api<{ success: boolean; data: { token: string } }>("/api/auth/register", {
+        method: 'POST',
+        body: payload,
+      });
+      if (res?.data?.token) auth.setToken(res.data.token);
+      toast({ title: "Registration Successful", description: "Please verify your mobile/email" });
+    } catch (e: any) {
+      toast({ title: "Registration failed", description: e.message, variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleChange = (field: string, value: string) => {
@@ -248,9 +274,9 @@ export function Login() {
                   </TabsContent>
                 </Tabs>
 
-                <Button onClick={handleLogin} className="w-full gradient-primary">
+                <Button onClick={handleLogin} className="w-full gradient-primary" disabled={isLoading}>
                   <LogIn className="h-4 w-4 mr-2" />
-                  Sign In
+                  {isLoading ? 'Signing In...' : 'Sign In'}
                 </Button>
 
                 <div className="text-center">
@@ -272,6 +298,8 @@ export function Login() {
                     <Input
                       id="reg-citizenship"
                       placeholder="Citizenship"
+                      value={formData.citizenship}
+                      onChange={(e) => handleChange("citizenship", e.target.value)}
                     />
                   </div>
                   <div className="space-y-2">
@@ -279,6 +307,8 @@ export function Login() {
                     <Input
                       id="reg-mobile"
                       placeholder="Mobile"
+                      value={formData.mobile}
+                      onChange={(e) => handleChange("mobile", e.target.value)}
                     />
                   </div>
                 </div>
@@ -289,6 +319,8 @@ export function Login() {
                     id="reg-email"
                     type="email"
                     placeholder="Email"
+                    value={formData.email}
+                    onChange={(e) => handleChange("email", e.target.value)}
                   />
                 </div>
 
@@ -298,12 +330,14 @@ export function Login() {
                     id="reg-password"
                     type="password"
                     placeholder="Create password"
+                    value={formData.password}
+                    onChange={(e) => handleChange("password", e.target.value)}
                   />
                 </div>
 
-                <Button onClick={handleRegister} className="w-full gradient-primary">
+                <Button onClick={handleRegister} className="w-full gradient-primary" disabled={isLoading}>
                   <UserPlus className="h-4 w-4 mr-2" />
-                  Register
+                  {isLoading ? 'Registering...' : 'Register'}
                 </Button>
               </CardContent>
             </TabsContent>
