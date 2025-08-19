@@ -66,25 +66,107 @@ export function Login() {
   const handleRegister = async () => {
     setIsLoading(true);
     try {
+      console.log('🔍 Starting registration process...');
+      console.log('Form data:', formData);
+
+      // Validate required fields
+      if (!formData.citizenship || !formData.mobile || !formData.password) {
+        console.log('❌ Validation failed: Missing required fields');
+        toast({ 
+          title: "Registration failed", 
+          description: "Please fill in all required fields", 
+          variant: "destructive" 
+        });
+        return;
+      }
+
+      // Validate citizenship number format
+      if (!/^\d{1,2}-\d{4}-\d{5}$/.test(formData.citizenship)) {
+        console.log('❌ Validation failed: Invalid citizenship format');
+        toast({ 
+          title: "Registration failed", 
+          description: "Citizenship number must be in format: XX-XXXX-XXXXX", 
+          variant: "destructive" 
+        });
+        return;
+      }
+
+      // Validate mobile number format
+      if (!/^(\+977)?[9][6-9]\d{8}$/.test(formData.mobile)) {
+        console.log('❌ Validation failed: Invalid mobile format');
+        toast({ 
+          title: "Registration failed", 
+          description: "Please enter a valid Nepali mobile number", 
+          variant: "destructive" 
+        });
+        return;
+      }
+
+      // Validate password length
+      if (formData.password.length < 6) {
+        console.log('❌ Validation failed: Password too short');
+        toast({ 
+          title: "Registration failed", 
+          description: "Password must be at least 6 characters", 
+          variant: "destructive" 
+        });
+        return;
+      }
+
       const payload = {
-        firstName: formData.email.split('@')[0] || 'Citizen',
+        firstName: formData.email?.split('@')[0] || 'Citizen',
         lastName: 'User',
-        citizenshipNumber: formData.citizenship || '01-0000-00000',
-        mobileNumber: formData.mobile || '+9779812345678',
+        citizenshipNumber: formData.citizenship,
+        mobileNumber: formData.mobile,
         email: formData.email || undefined,
-        password: formData.password || 'secret12',
+        password: formData.password,
         dateOfBirth: '1990-01-01',
         gender: 'other',
-        address: { province: 'Bagmati', district: 'Kathmandu', municipality: 'KMC', ward: 1, streetAddress: 'N/A' }
+        address: { 
+          province: 'Bagmati', 
+          district: 'Kathmandu', 
+          municipality: 'KMC', 
+          ward: 1, 
+          streetAddress: 'N/A' 
+        }
       };
+
+      console.log('📤 Sending registration payload:', payload);
+      console.log('🌐 API URL: /api/auth/register');
+
       const res = await api<{ success: boolean; data: { token: string } }>("/api/auth/register", {
         method: 'POST',
         body: payload,
       });
-      if (res?.data?.token) auth.setToken(res.data.token);
-      toast({ title: "Registration Successful", description: "Please verify your mobile/email" });
+      
+      console.log('📥 Registration response:', res);
+      
+      if (res?.data?.token) {
+        console.log('✅ Registration successful!');
+        auth.setToken(res.data.token);
+        toast({ title: "Registration Successful", description: "Please verify your mobile/email" });
+        // Navigate to home page after successful registration
+        navigate('/');
+      } else {
+        console.log('❌ Registration response missing token');
+        toast({ 
+          title: "Registration failed", 
+          description: "Invalid response from server", 
+          variant: "destructive" 
+        });
+      }
     } catch (e: any) {
-      toast({ title: "Registration failed", description: e.message, variant: "destructive" });
+      console.error('❌ Registration error:', e);
+      console.error('Error details:', {
+        message: e.message,
+        stack: e.stack,
+        name: e.name
+      });
+      toast({ 
+        title: "Registration failed", 
+        description: e.message || "An error occurred during registration", 
+        variant: "destructive" 
+      });
     } finally {
       setIsLoading(false);
     }
@@ -280,7 +362,7 @@ export function Login() {
                 </Button>
 
                 <div className="text-center">
-                  <Button variant="link" className="text-sm">
+                  <Button variant="link" className="text-sm" onClick={() => navigate('/forgot-password')}>
                     Forgot Password?
                   </Button>
                 </div>
@@ -294,22 +376,26 @@ export function Login() {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <Label htmlFor="reg-citizenship">Citizenship Number</Label>
+                    <Label htmlFor="reg-citizenship">Citizenship Number *</Label>
                     <Input
                       id="reg-citizenship"
-                      placeholder="Citizenship"
+                      placeholder="XX-XXXX-XXXXX"
                       value={formData.citizenship}
                       onChange={(e) => handleChange("citizenship", e.target.value)}
+                      required
                     />
+                    <p className="text-xs text-muted-foreground">Format: XX-XXXX-XXXXX</p>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="reg-mobile">Mobile Number</Label>
+                    <Label htmlFor="reg-mobile">Mobile Number *</Label>
                     <Input
                       id="reg-mobile"
-                      placeholder="Mobile"
+                      placeholder="+977XXXXXXXXX"
                       value={formData.mobile}
                       onChange={(e) => handleChange("mobile", e.target.value)}
+                      required
                     />
+                    <p className="text-xs text-muted-foreground">Nepali mobile number</p>
                   </div>
                 </div>
 
@@ -318,21 +404,23 @@ export function Login() {
                   <Input
                     id="reg-email"
                     type="email"
-                    placeholder="Email"
+                    placeholder="your.email@example.com"
                     value={formData.email}
                     onChange={(e) => handleChange("email", e.target.value)}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="reg-password">Password</Label>
+                  <Label htmlFor="reg-password">Password *</Label>
                   <Input
                     id="reg-password"
                     type="password"
-                    placeholder="Create password"
+                    placeholder="Minimum 6 characters"
                     value={formData.password}
                     onChange={(e) => handleChange("password", e.target.value)}
+                    required
                   />
+                  <p className="text-xs text-muted-foreground">At least 6 characters</p>
                 </div>
 
                 <Button onClick={handleRegister} className="w-full gradient-primary" disabled={isLoading}>

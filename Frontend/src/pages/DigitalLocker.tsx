@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { api } from "@/lib/api";
 import {
   Upload,
   FileText,
@@ -26,6 +27,10 @@ import {
 export function DigitalLocker() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [uploading, setUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [docName, setDocName] = useState("");
+  const [docCategory, setDocCategory] = useState("identity");
   const { toast } = useToast();
 
   const documentCategories = [
@@ -36,7 +41,7 @@ export function DigitalLocker() {
     { id: "other", label: "Other", count: 1 },
   ];
 
-  const documents = [
+  const initialDocuments = [
     {
       id: "1",
       name: "Citizenship Certificate",
@@ -99,6 +104,8 @@ export function DigitalLocker() {
     },
   ];
 
+  const [documents, setDocuments] = useState(initialDocuments);
+
   const filteredDocuments = documents.filter(doc => {
     const matchesSearch = doc.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === "all" || doc.category === selectedCategory;
@@ -144,11 +151,47 @@ export function DigitalLocker() {
     }
   };
 
-  const handleUpload = () => {
-    toast({
-      title: "Document Uploaded",
-      description: "Your document has been uploaded successfully and is being verified.",
-    });
+  const handleUpload = async () => {
+    if (!selectedFile || !docName) {
+      toast({ title: "Missing info", description: "Please provide name and choose a file.", variant: "destructive" });
+      return;
+    }
+    try {
+      setUploading(true);
+      const form = new FormData();
+      form.append('file', selectedFile);
+      form.append('name', docName);
+      // Hint backend to replace older file with same name for this user
+      form.append('replace', 'true');
+      form.append('category', docCategory);
+      const res = await api<{ success: boolean; data: { file: { url: string; filename: string; size: number; mimeType: string } } }>("/api/upload", {
+        method: 'POST',
+        body: form,
+        headers: {}
+      });
+      toast({ title: "Document Uploaded", description: `Saved as ${res.data.file.filename}` });
+
+      // Add to local list so it is visible and viewable immediately
+      const ext = (selectedFile.name.split('.').pop() || '').toUpperCase();
+      const newDoc = {
+        id: `${Date.now()}`,
+        name: docName || selectedFile.name,
+        type: ext || (selectedFile.type.includes('pdf') ? 'PDF' : 'FILE'),
+        size: `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB`,
+        uploadDate: new Date().toISOString().slice(0, 10),
+        category: docCategory,
+        status: 'pending',
+        preview: '/placeholder.svg',
+        url: res.data.file.url,
+      } as any;
+      setDocuments(prev => [newDoc, ...prev]);
+      setSelectedFile(null);
+      setDocName("");
+    } catch (e: any) {
+      toast({ title: "Upload failed", description: e.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleDelete = (docName: string) => {
@@ -214,11 +257,13 @@ export function DigitalLocker() {
                       <Input
                         id="doc-name"
                         placeholder="Enter document name"
+                        value={docName}
+                        onChange={(e) => setDocName(e.target.value)}
                       />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="doc-category">Category</Label>
-                      <select className="w-full p-2 border rounded-md">
+                      <select className="w-full p-2 border rounded-md" value={docCategory} onChange={(e) => setDocCategory(e.target.value)}>
                         <option value="identity">Identity</option>
                         <option value="certificates">Certificates</option>
                         <option value="property">Property</option>
@@ -231,11 +276,12 @@ export function DigitalLocker() {
                         id="doc-file"
                         type="file"
                         accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
                       />
                     </div>
-                    <Button onClick={handleUpload} className="w-full gradient-primary">
+                    <Button onClick={handleUpload} className="w-full gradient-primary" disabled={uploading}>
                       <Upload className="h-4 w-4 mr-2" />
-                      Upload Document
+                      {uploading ? 'Uploading...' : 'Upload Document'}
                     </Button>
                   </div>
                 </DialogContent>
@@ -303,6 +349,15 @@ export function DigitalLocker() {
                       <Button 
                         variant="outline" 
                         size="sm" 
+                        onClick={() => {
+                          // Open in new tab if we have a URL or a preview placeholder
+                          const url = (doc as any).url || (doc as any).preview || '/placeholder.svg';
+                          if (url) {
+                            window.open(url, '_blank', 'noopener');
+                          } else {
+                            toast({ title: 'File not available', description: 'This item has no file URL', variant: 'destructive' });
+                          }
+                        }}
                         className="flex-1 text-xs hover:scale-105 transition-all hover:bg-primary hover:text-primary-foreground"
                       >
                         <Eye className="h-3 w-3 mr-1" />
@@ -312,6 +367,19 @@ export function DigitalLocker() {
                       <Button 
                         variant="outline" 
                         size="sm" 
+                        onClick={() => {
+                          const url = (doc as any).url || (doc as any).preview;
+                          if (url && !url.endsWith('.svg')) {
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = doc.name || 'document';
+                            document.body.appendChild(a);
+                            a.click();
+                            a.remove();
+                          } else {
+                            toast({ title: 'Download not available', description: 'This item has no downloadable file', variant: 'destructive' });
+                          }
+                        }}
                         className="flex-1 text-xs hover:scale-105 transition-all hover:bg-success hover:text-white"
                       >
                         <Download className="h-3 w-3 mr-1" />

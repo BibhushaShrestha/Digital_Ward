@@ -41,3 +41,19 @@ Run `npm run seed` inside `backend` to populate sample services that match the f
 ## Environment
 - Edit `backend/.env` based on `backend/env.sample`
 - Vite dev proxy is configured in `Frontend/vite.config.ts`
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

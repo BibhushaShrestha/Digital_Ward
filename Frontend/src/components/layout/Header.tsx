@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { api, auth } from "@/lib/api";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,20 +35,31 @@ const navigationItems = [
   { name: "Home", href: "/", icon: Home },
   { name: "About Ward", href: "/about", icon: Info },
   { name: "Services", href: "/services", icon: FileText },
-  { name: "My Applications", href: "/my-applications", icon: CheckSquare },
+  
   { name: "Digital Locker", href: "/digital-locker", icon: FolderOpen },
   { name: "Staff Status", href: "/staff-status", icon: Users },
   { name: "Complaints", href: "/complaints", icon: MessageSquare },
-  { name: "Broadcasts", href: "/broadcasts", icon: Radio },
-  { name: "Events", href: "/events", icon: Calendar },
-  { name: "Queue System", href: "/queue", icon: Clock },
-  { name: "Analytics", href: "/analytics", icon: BarChart3 },
+  
 ];
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [language, setLanguage] = useState("en");
   const location = useLocation();
+  const [currentUser, setCurrentUser] = useState<any | null>(null);
+
+  useEffect(() => {
+    const token = auth.getToken();
+    if (!token) return;
+    (async () => {
+      try {
+        const res = await api<{ success: boolean; data: { user: any } }>("/api/auth/me");
+        setCurrentUser(res.data.user);
+      } catch {
+        // ignore
+      }
+    })();
+  }, [location.pathname]);
 
   const toggleLanguage = () => {
     setLanguage(language === "en" ? "np" : "en");
@@ -95,27 +107,7 @@ export function Header() {
             })}
             
             {/* More Menu */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="nav-item">
-                  <Menu className="h-4 w-4" />
-                  <span className="text-sm font-medium">More</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                {navigationItems.slice(7).map((item) => {
-                  const IconComponent = item.icon;
-                  return (
-                    <DropdownMenuItem key={item.name} asChild>
-                      <Link to={item.href} className="flex items-center space-x-2">
-                        <IconComponent className="h-4 w-4" />
-                        <span>{item.name}</span>
-                      </Link>
-                    </DropdownMenuItem>
-                  );
-                })}
-              </DropdownMenuContent>
-            </DropdownMenu>
+           
           </nav>
 
           {/* Right side actions */}
@@ -138,7 +130,7 @@ export function Header() {
                   <Avatar className="h-10 w-10">
                     <AvatarImage src="/placeholder-avatar.jpg" alt="Profile" />
                     <AvatarFallback className="bg-primary text-primary-foreground">
-                      JD
+                      {(currentUser?.firstName?.[0] || 'J').toUpperCase()}{(currentUser?.lastName?.[0] || 'D').toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                   <Badge 
@@ -152,10 +144,12 @@ export function Header() {
               <DropdownMenuContent align="end" className="w-56">
                 <div className="flex items-center justify-start gap-2 p-2">
                   <div className="flex flex-col space-y-1 leading-none">
-                    <p className="font-medium">John Doe</p>
-                    <p className="w-[200px] truncate text-sm text-muted-foreground">
-                      Citizen ID: 1234567890
-                    </p>
+                    <p className="font-medium">{currentUser?.fullName || 'Guest User'}</p>
+                    {currentUser?.email && (
+                      <p className="w-[200px] truncate text-sm text-muted-foreground">
+                        {currentUser.email}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <DropdownMenuSeparator />
@@ -184,11 +178,11 @@ export function Header() {
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link to="/login" className="text-destructive flex items-center space-x-2">
+                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); auth.clearToken(); window.location.href = '/login'; }}>
+                  <div className="text-destructive flex items-center space-x-2">
                     <LogOut className="h-4 w-4" />
                     <span>Sign out</span>
-                  </Link>
+                  </div>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

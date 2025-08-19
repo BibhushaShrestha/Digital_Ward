@@ -75,18 +75,7 @@ export function Services() {
       duration: "7-10 days",
       color: "bg-green-500",
     },
-    {
-      id: "unmarried-cert",
-      title: "Unmarried Certificate",
-      nepali: "अविवाहित प्रमाणपत्र",
-      description: "Certificate confirming unmarried status",
-      icon: User,
-      category: "certificates",
-      documents: ["Citizenship", "Application form", "Character certificate"],
-      fee: "Rs. 50",
-      duration: "3-5 days",
-      color: "bg-indigo-500",
-    },
+    
     {
       id: "relationship-cert",
       title: "Relationship Verification",
@@ -99,42 +88,9 @@ export function Services() {
       duration: "5-7 days",
       color: "bg-teal-500",
     },
-    {
-      id: "character-cert",
-      title: "Character Certificate",
-      nepali: "चरित्र प्रमाणपत्र",
-      description: "Certificate of good character and conduct",
-      icon: User,
-      category: "certificates",
-      documents: ["Citizenship", "Police clearance", "Application form"],
-      fee: "Rs. 100",
-      duration: "7-10 days",
-      color: "bg-cyan-500",
-    },
-    {
-      id: "income-cert",
-      title: "Income Certificate",
-      nepali: "आय प्रमाणपत्र",
-      description: "Certificate of annual income verification",
-      icon: FileText,
-      category: "certificates",
-      documents: ["Citizenship", "Income documents", "Tax returns", "Application form"],
-      fee: "Rs. 150",
-      duration: "5-7 days",
-      color: "bg-emerald-500",
-    },
-    {
-      id: "recommendation",
-      title: "Recommendation Letter",
-      nepali: "सिफारिस पत्र",
-      description: "Official recommendation for various purposes",
-      icon: FileText,
-      category: "letters",
-      documents: ["Citizenship", "Supporting documents", "Application form"],
-      fee: "Rs. 100",
-      duration: "1-2 days",
-      color: "bg-purple-500",
-    },
+   
+    
+    
     {
       id: "tax-clearance",
       title: "Tax Clearance Certificate",
@@ -147,18 +103,7 @@ export function Services() {
       duration: "5-7 days",
       color: "bg-orange-500",
     },
-    {
-      id: "land-ownership",
-      title: "Land Ownership Certificate",
-      nepali: "जग्गा स्वामित्व प्रमाणपत्र",
-      description: "Certificate verifying land ownership",
-      icon: MapPin,
-      category: "certificates",
-      documents: ["Land registration", "Citizenship", "Survey document", "Application form"],
-      fee: "Rs. 500",
-      duration: "10-15 days",
-      color: "bg-amber-500",
-    },
+   
   ];
 
   const applications = [

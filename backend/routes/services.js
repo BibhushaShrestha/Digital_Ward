@@ -7,6 +7,63 @@ import { protect, authorize, checkPermission } from '../middleware/auth.js';
 
 const router = express.Router();
 
+// In-memory services storage for development when MongoDB is not available
+const inMemoryServices = new Map();
+
+// Initialize with some default services for development
+const defaultServices = [
+  {
+    _id: 'birth-certificate',
+    title: 'Birth Certificate',
+    nepaliTitle: 'जन्म प्रमाणपत्र',
+    description: 'Official birth registration and certificate issuance',
+    serviceId: 'BIRTH_CERT',
+    category: 'certificates',
+    fee: { amount: 500, currency: 'NPR' },
+    processingTime: { minDays: 3, maxDays: 5, displayText: '3-5 days' },
+    requiredDocuments: ['Parents\' citizenship', 'Hospital record', 'Application form'],
+    isActive: true,
+    priority: 1,
+    icon: 'baby',
+    color: '#4CAF50'
+  },
+  {
+    _id: 'death-certificate',
+    title: 'Death Certificate',
+    nepaliTitle: 'मृत्यु प्रमाणपत्र',
+    description: 'Official death registration and certificate issuance',
+    serviceId: 'DEATH_CERT',
+    category: 'certificates',
+    fee: { amount: 300, currency: 'NPR' },
+    processingTime: { minDays: 2, maxDays: 4, displayText: '2-4 days' },
+    requiredDocuments: ['Hospital record', 'Police report', 'Application form'],
+    isActive: true,
+    priority: 2,
+    icon: 'file-text',
+    color: '#FF9800'
+  },
+  {
+    _id: 'marriage-certificate',
+    title: 'Marriage Certificate',
+    nepaliTitle: 'विवाह प्रमाणपत्र',
+    description: 'Official marriage registration and certificate issuance',
+    serviceId: 'MARRIAGE_CERT',
+    category: 'certificates',
+    fee: { amount: 1000, currency: 'NPR' },
+    processingTime: { minDays: 5, maxDays: 7, displayText: '5-7 days' },
+    requiredDocuments: ['Citizenship certificates', 'Marriage registration', 'Application form'],
+    isActive: true,
+    priority: 3,
+    icon: 'heart',
+    color: '#E91E63'
+  }
+];
+
+// Initialize in-memory services with defaults
+defaultServices.forEach(service => {
+  inMemoryServices.set(service._id, service);
+});
+
 // @desc    Get all active services
 // @route   GET /api/services
 // @access  Public
@@ -45,48 +102,105 @@ router.get('/', [
     };
   }
 
-  const services = await Service.find(query)
-    .sort({ priority: -1, title: 1 })
-    .skip(skip)
-    .limit(parseInt(limit));
+  try {
+    // Try to use MongoDB if available
+    const services = await Service.find(query)
+      .sort({ priority: -1, title: 1 })
+      .skip(skip)
+      .limit(parseInt(limit));
 
-  const total = await Service.countDocuments(query);
+    const total = await Service.countDocuments(query);
 
-  res.json({
-    success: true,
-    data: {
-      services,
-      pagination: {
-        current: parseInt(page),
-        total: Math.ceil(total / limit),
-        hasNext: page * limit < total,
-        hasPrev: page > 1,
-        totalItems: total
+    res.json({
+      success: true,
+      data: {
+        services,
+        pagination: {
+          current: parseInt(page),
+          total: Math.ceil(total / limit),
+          hasNext: page * limit < total,
+          hasPrev: page > 1,
+          totalItems: total
+        }
       }
-    }
-  });
+    });
+  } catch (error) {
+    // MongoDB not available, use in-memory storage
+    console.log('MongoDB not available, using in-memory storage for services list');
+    
+    let services = Array.from(inMemoryServices.values())
+      .filter(service => service.isActive)
+      .filter(service => !category || service.category === category)
+      .filter(service => !search || 
+        service.title.toLowerCase().includes(search.toLowerCase()) ||
+        service.description.toLowerCase().includes(search.toLowerCase()) ||
+        service.tags?.some(tag => tag.toLowerCase().includes(search.toLowerCase()))
+      );
+
+    const total = services.length;
+    services = services
+      .sort((a, b) => (b.priority || 0) - (a.priority || 0) || a.title.localeCompare(b.title))
+      .slice(skip, skip + parseInt(limit));
+
+    res.json({
+      success: true,
+      data: {
+        services,
+        pagination: {
+          current: parseInt(page),
+          total: Math.ceil(total / limit),
+          hasNext: page * limit < total,
+          hasPrev: page > 1,
+          totalItems: total
+        }
+      }
+    });
+  }
 }));
 
 // @desc    Get service by ID
 // @route   GET /api/services/:id
 // @access  Public
 router.get('/:id', asyncHandler(async (req, res) => {
-  const service = await Service.findById(req.params.id);
+  try {
+    // Try to use MongoDB if available
+    const service = await Service.findById(req.params.id);
 
-  if (!service) {
-    res.status(404);
-    throw new Error('Service not found');
+    if (!service) {
+      res.status(404);
+      throw new Error('Service not found');
+    }
+
+    if (!service.isActive) {
+      res.status(404);
+      throw new Error('Service is not available');
+    }
+
+    res.json({
+      success: true,
+      data: { service }
+    });
+  } catch (error) {
+    // MongoDB not available, use in-memory storage
+    console.log('MongoDB not available, using in-memory storage for service details');
+    
+    const service = inMemoryServices.get(req.params.id);
+    
+    if (!service) {
+      res.status(404);
+      throw new Error('Service not found');
+    }
+
+    if (!service.isActive) {
+      res.status(404);
+      throw new Error('Service is not available');
+    }
+
+    res.json({
+      success: true,
+      data: { service }
+    });
   }
-
-  if (!service.isActive) {
-    res.status(404);
-    throw new Error('Service is not available');
-  }
-
-  res.json({
-    success: true,
-    data: { service }
-  });
 }));
 
 // @desc    Get popular services
@@ -103,12 +217,28 @@ router.get('/popular', [
 
   const limit = parseInt(req.query.limit) || 10;
 
-  const services = await Service.findPopular(limit);
+  try {
+    // Try to use MongoDB if available
+    const services = await Service.findPopular(limit);
 
-  res.json({
-    success: true,
-    data: { services }
-  });
+    res.json({
+      success: true,
+      data: { services }
+    });
+  } catch (error) {
+    // MongoDB not available, use in-memory storage
+    console.log('MongoDB not available, using in-memory storage for popular services');
+    
+    const services = Array.from(inMemoryServices.values())
+      .filter(service => service.isActive)
+      .sort((a, b) => (b.priority || 0) - (a.priority || 0))
+      .slice(0, limit);
+
+    res.json({
+      success: true,
+      data: { services }
+    });
+  }
 }));
 
 // @desc    Search services
@@ -126,34 +256,89 @@ router.get('/search', [
 
   const { q, limit = 20 } = req.query;
 
-  const services = await Service.searchServices(q).limit(parseInt(limit));
+  try {
+    // Try to use MongoDB if available
+    const services = await Service.searchServices(q).limit(parseInt(limit));
 
-  res.json({
-    success: true,
-    data: { services }
-  });
+    res.json({
+      success: true,
+      data: { services }
+    });
+  } catch (error) {
+    // MongoDB not available, use in-memory storage
+    console.log('MongoDB not available, using in-memory storage for service search');
+    
+    const services = Array.from(inMemoryServices.values())
+      .filter(service => service.isActive)
+      .filter(service => 
+        service.title.toLowerCase().includes(q.toLowerCase()) ||
+        service.description.toLowerCase().includes(q.toLowerCase()) ||
+        service.tags?.some(tag => tag.toLowerCase().includes(q.toLowerCase()))
+      )
+      .slice(0, parseInt(limit));
+
+    res.json({
+      success: true,
+      data: { services }
+    });
+  }
 }));
 
 // @desc    Get service categories
 // @route   GET /api/services/categories
 // @access  Public
 router.get('/categories', asyncHandler(async (req, res) => {
-  const categories = await Service.aggregate([
-    { $match: { isActive: true } },
-    {
-      $group: {
-        _id: '$category',
-        count: { $sum: 1 },
-        services: { $push: { id: '$_id', title: '$title', nepaliTitle: '$nepaliTitle' } }
-      }
-    },
-    { $sort: { count: -1 } }
-  ]);
+  try {
+    // Try to use MongoDB if available
+    const categories = await Service.aggregate([
+      { $match: { isActive: true } },
+      {
+        $group: {
+          _id: '$category',
+          count: { $sum: 1 },
+          services: { $push: { id: '$_id', title: '$title', nepaliTitle: '$nepaliTitle' } }
+        }
+      },
+      { $sort: { count: -1 } }
+    ]);
 
-  res.json({
-    success: true,
-    data: { categories }
-  });
+    res.json({
+      success: true,
+      data: { categories }
+    });
+  } catch (error) {
+    // MongoDB not available, use in-memory storage
+    console.log('MongoDB not available, using in-memory storage for service categories');
+    
+    const services = Array.from(inMemoryServices.values()).filter(service => service.isActive);
+    const categoryMap = new Map();
+    
+    services.forEach(service => {
+      if (!categoryMap.has(service.category)) {
+        categoryMap.set(service.category, {
+          _id: service.category,
+          count: 0,
+          services: []
+        });
+      }
+      
+      const category = categoryMap.get(service.category);
+      category.count++;
+      category.services.push({
+        id: service._id,
+        title: service.title,
+        nepaliTitle: service.nepaliTitle
+      });
+    });
+    
+    const categories = Array.from(categoryMap.values())
+      .sort((a, b) => b.count - a.count);
+
+    res.json({
+      success: true,
+      data: { categories }
+    });
+  }
 }));
 
 // @desc    Create new service (Admin/Staff only)

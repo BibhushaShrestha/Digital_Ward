@@ -11,7 +11,7 @@ const complaintSchema = new mongoose.Schema({
   complainant: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: false
   },
 
   // Complaint Details
@@ -350,17 +350,17 @@ complaintSchema.index({ submittedAt: -1 });
 complaintSchema.index({ assignedTo: 1 });
 complaintSchema.index({ isUrgent: -1 });
 
-// Pre-save middleware
-complaintSchema.pre('save', function(next) {
+// Ensure fields exist before validation runs
+complaintSchema.pre('validate', function(next) {
   this.lastUpdatedAt = new Date();
-  
-  // Generate complaint ID if not exists
+
+  // Generate complaint ID before required-field validation
   if (!this.complaintId) {
     const timestamp = Date.now().toString().slice(-8);
     const random = Math.random().toString(36).substr(2, 4).toUpperCase();
     this.complaintId = `CMP${timestamp}${random}`;
   }
-  
+
   next();
 });
 

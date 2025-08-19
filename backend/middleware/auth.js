@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import asyncHandler from 'express-async-handler';
+import mongoose from 'mongoose';
 import User from '../models/User.js';
 
 // Protect routes - verify JWT token
@@ -12,15 +13,28 @@ export const protect = asyncHandler(async (req, res, next) => {
       // Get token from header
       token = req.headers.authorization.split(' ')[1];
 
-      // Verify token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      // Verify token (use same default as token generation)
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'super-secret-change-me-development-only');
 
       // Get user from token
-      req.user = await User.findById(decoded.id).select('-password');
+      if (mongoose.Types.ObjectId.isValid(decoded.id)) {
+        req.user = await User.findById(decoded.id).select('-password');
 
-      if (!req.user) {
-        res.status(401);
-        throw new Error('User not found');
+        if (!req.user) {
+          res.status(401);
+          throw new Error('User not found');
+        }
+      } else {
+        // Dev fallback: synthesize a minimal user object for non-ObjectId tokens
+        req.user = {
+          id: decoded.id,
+          _id: decoded.id,
+          role: 'citizen',
+          isActive: true,
+          isBlocked: false,
+          permissions: [],
+          address: { province: '', district: '', municipality: '', ward: 1, streetAddress: '' }
+        };
       }
 
       // Check if user is active
@@ -39,7 +53,7 @@ export const protect = asyncHandler(async (req, res, next) => {
     } catch (error) {
       console.error('Token verification error:', error);
       res.status(401);
-      throw new Error('Not authorized, token failed');
+      throw new Error(error?.message || 'Not authorized, token failed');
     }
   }
 
@@ -155,8 +169,20 @@ export const optionalAuth = asyncHandler(async (req, res, next) => {
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
     try {
       token = req.headers.authorization.split(' ')[1];
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      req.user = await User.findById(decoded.id).select('-password');
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'super-secret-change-me-development-only');
+      if (mongoose.Types.ObjectId.isValid(decoded.id)) {
+        req.user = await User.findById(decoded.id).select('-password');
+      } else {
+        req.user = {
+          id: decoded.id,
+          _id: decoded.id,
+          role: 'citizen',
+          isActive: true,
+          isBlocked: false,
+          permissions: [],
+          address: { province: '', district: '', municipality: '', ward: 1, streetAddress: '' }
+        };
+      }
     } catch (error) {
       // Don't throw error, just continue without user
       req.user = null;

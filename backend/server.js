@@ -8,6 +8,7 @@ import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import 'dotenv/config'
 
 // Import routes
 import authRoutes from './routes/auth.js';
@@ -19,6 +20,7 @@ import complaintRoutes from './routes/complaints.js';
 // import eventRoutes from './routes/events.js';
 // import queueRoutes from './routes/queue.js';
 import analyticsRoutes from './routes/analytics.js';
+import uploadRoutes from './routes/upload.js';
 // import digitalLockerRoutes from './routes/digitalLocker.js';
 // import staffRoutes from './routes/staff.js';
 
@@ -26,8 +28,6 @@ import analyticsRoutes from './routes/analytics.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { notFound } from './middleware/notFound.js';
 
-// Load environment variables
-dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -103,6 +103,7 @@ app.use('/api/complaints', complaintRoutes);
 // app.use('/api/events', eventRoutes);
 // app.use('/api/queue', queueRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/upload', uploadRoutes);
 // app.use('/api/digital-locker', digitalLockerRoutes);
 // app.use('/api/staff', staffRoutes);
 
@@ -115,21 +116,26 @@ const connectDB = async () => {
   try {
     const conn = await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/ward-connect-nepal');
     console.log(`MongoDB Connected: ${conn.connection.host}`);
+    return true;
   } catch (error) {
     console.error('Error connecting to MongoDB:', error.message);
-    process.exit(1);
+    console.log('⚠️  Starting server without database connection for development...');
+    return false;
   }
 };
 
 // Start server
 const startServer = async () => {
-  await connectDB();
+  const dbConnected = await connectDB();
   
   app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`🔗 API URL: http://localhost:${PORT}/api`);
     console.log(`🏥 Health Check: http://localhost:${PORT}/api/health`);
+    if (!dbConnected) {
+      console.log('⚠️  Database not connected - some features may not work');
+    }
   });
 };
 

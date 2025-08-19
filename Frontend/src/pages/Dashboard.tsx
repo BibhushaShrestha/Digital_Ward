@@ -1,6 +1,8 @@
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useEffect, useState } from "react";
+import { api } from "@/lib/api";
 import { Progress } from "@/components/ui/progress";
 import {
   FileText,
@@ -17,6 +19,15 @@ import {
 import { Link } from "react-router-dom";
 
 export function Dashboard() {
+  const [userName, setUserName] = useState<string>("John");
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api<{ success: boolean; data: { user: any } }>("/api/auth/me");
+        setUserName(res.data.user.firstName || res.data.user.fullName || "User");
+      } catch {}
+    })();
+  }, []);
   const stats = [
     {
       title: "Active Applications",
@@ -121,7 +132,7 @@ export function Dashboard() {
       {/* Welcome Section */}
       <div className="gradient-hero rounded-2xl p-8 text-white">
         <div className="max-w-2xl">
-          <h1 className="text-3xl font-bold mb-2">Welcome back, John!</h1>
+          <h1 className="text-3xl font-bold mb-2">Welcome back, {userName}!</h1>
           <p className="text-white/90 mb-6">
             Stay updated with your applications, events, and ward services. 
             We're here to serve you better.

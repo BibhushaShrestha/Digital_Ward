@@ -25,6 +25,8 @@ interface CertificateApplicationFormProps {
   service: Service | null;
 }
 
+type LockerDoc = { id: string; name: string; verified: boolean; url?: string };
+
 export function CertificateApplicationForm({ isOpen, onClose, service }: CertificateApplicationFormProps) {
   const [formData, setFormData] = useState({
     fullName: "",
@@ -41,14 +43,18 @@ export function CertificateApplicationForm({ isOpen, onClose, service }: Certifi
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
-  const availableDocuments = [
+  const [availableDocuments, setAvailableDocuments] = useState<LockerDoc[]>([
     { id: "1", name: "Citizenship Certificate", verified: true },
     { id: "2", name: "Birth Certificate", verified: true },
     { id: "3", name: "Passport Copy", verified: false },
     { id: "4", name: "Marriage Certificate", verified: true },
     { id: "5", name: "Property Deed", verified: false },
     { id: "6", name: "Academic Certificate", verified: true },
-  ];
+  ]);
+  const [showUpload, setShowUpload] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [newDocName, setNewDocName] = useState("");
+  const [newDocFile, setNewDocFile] = useState<File | null>(null);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -56,6 +62,32 @@ export function CertificateApplicationForm({ isOpen, onClose, service }: Certifi
 
   const toggleDocument = (docId: string) => {
     setSelectedDocuments(prev => prev.includes(docId) ? prev.filter(id => id !== docId) : [...prev, docId]);
+  };
+
+  const uploadNewDocument = async () => {
+    if (!newDocFile) {
+      toast({ title: "Choose a file", description: "Select a PDF/JPG/PNG to upload.", variant: "destructive" });
+      return;
+    }
+    try {
+      setUploading(true);
+      const form = new FormData();
+      form.append('file', newDocFile);
+      form.append('name', newDocName || newDocFile.name);
+      const res = await api<{ success: boolean; data: { file: { filename: string; url: string } } }>("/api/upload", { method: 'POST', body: form });
+      const id = `${Date.now()}`;
+      const item: LockerDoc = { id, name: newDocName || newDocFile.name, verified: false, url: res.data.file.url };
+      setAvailableDocuments(prev => [item, ...prev]);
+      setSelectedDocuments(prev => [id, ...prev]);
+      setShowUpload(false);
+      setNewDocFile(null);
+      setNewDocName("");
+      toast({ title: "Uploaded", description: `Saved as ${res.data.file.filename}` });
+    } catch (e: any) {
+      toast({ title: "Upload failed", description: e.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -184,10 +216,21 @@ export function CertificateApplicationForm({ isOpen, onClose, service }: Certifi
               ))}
             </div>
 
-            <Button variant="outline" className="w-full sm:w-auto">
-              <Upload className="h-4 w-4 mr-2" />
-              Upload New Document
-            </Button>
+            <div className="space-y-2">
+              <Button variant="outline" className="w-full sm:w-auto" onClick={() => setShowUpload(v => !v)}>
+                <Upload className="h-4 w-4 mr-2" />
+                {showUpload ? 'Close Uploader' : 'Upload New Document'}
+              </Button>
+              {showUpload && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <Input placeholder="Document name" value={newDocName} onChange={(e) => setNewDocName(e.target.value)} className="sm:col-span-1" />
+                  <Input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => setNewDocFile(e.target.files?.[0] || null)} className="sm:col-span-1" />
+                  <Button onClick={uploadNewDocument} disabled={uploading || !newDocFile} className="sm:col-span-1">
+                    {uploading ? 'Uploading...' : 'Upload'}
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="space-y-2">

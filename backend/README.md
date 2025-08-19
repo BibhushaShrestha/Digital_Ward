@@ -52,3 +52,4 @@ npm run dev
   - GET `/api/analytics/dashboard`
 
 Auth uses Bearer JWT token in `Authorization` header.
+
